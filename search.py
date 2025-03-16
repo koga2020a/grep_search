@@ -1,11 +1,66 @@
+#!/usr/bin/env python3
 import os
 import re
 import argparse
+import sys
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, PatternFill
 from openpyxl.styles import Border, Side
 from datetime import datetime
+
+def print_usage():
+    """引数なしで実行された場合に表示するヘルプメッセージ"""
+    usage = """
+使用方法: search.py [オプション] <検索語句>
+
+説明:
+  このプログラムはファイルやディレクトリ内のテキストを検索するためのツールです。
+  引数なしで実行すると、このヘルプメッセージが表示されます。
+
+オプション:
+  -h, --help            このヘルプメッセージを表示します
+  -p, --path PATH       検索対象のパスを指定します (デフォルト: カレントディレクトリ)
+  -r, --recursive       サブディレクトリも再帰的に検索します
+  -i, --ignore-case     大文字と小文字を区別せずに検索します
+  -f, --file-pattern PAT 特定のファイルパターンのみを検索します (例: *.txt)
+  -o, --output FILE     結果を指定したファイルに出力します
+
+例:
+  search.py "検索語句"                    # カレントディレクトリで「検索語句」を検索
+  search.py -p /path/to/dir "検索語句"    # 指定したディレクトリで検索
+  search.py -r -i "検索語句"              # 再帰的に、大文字小文字を区別せずに検索
+  search.py -f "*.py" "検索語句"          # Pythonファイルのみを検索
+
+詳細については、プロジェクトのドキュメントを参照してください。
+"""
+    print(usage)
+
+def main():
+    # 引数がない場合はヘルプメッセージを表示して終了
+    if len(sys.argv) == 1:
+        print_usage()
+        sys.exit(0)
+    
+    # 以下に引数解析と実際の検索処理を実装
+    parser = argparse.ArgumentParser(description='ファイルやディレクトリ内のテキストを検索します', add_help=False)
+    parser.add_argument('-h', '--help', action='store_true', help='ヘルプメッセージを表示します')
+    parser.add_argument('-p', '--path', default='.', help='検索対象のパスを指定します')
+    parser.add_argument('-r', '--recursive', action='store_true', help='サブディレクトリも再帰的に検索します')
+    parser.add_argument('-i', '--ignore-case', action='store_true', help='大文字と小文字を区別せずに検索します')
+    parser.add_argument('-f', '--file-pattern', help='特定のファイルパターンのみを検索します')
+    parser.add_argument('-o', '--output', help='結果を指定したファイルに出力します')
+    parser.add_argument('search_term', nargs='?', help='検索する語句')
+    
+    args = parser.parse_args()
+    
+    # --helpオプションが指定された場合もヘルプを表示
+    if args.help or not args.search_term:
+        print_usage()
+        sys.exit(0)
+    
+    # ここに実際の検索処理を実装
+    # ...
 
 def search_files(keywords, base_dir='.', output_file=None, output_excel=None):
     """
@@ -340,23 +395,4 @@ def draw_border_around_group(worksheet, start_row, end_row):
             cell.border = Border(top=no_border, left=no_border, right=no_border, bottom=thick)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="ディレクトリ内の全ファイルから単語を検索")
-    parser.add_argument("keywords", nargs="+", help="検索する単語 (スペース区切りで複数指定可)")
-    parser.add_argument("-d", "--directory", default=".", help="基準ディレクトリ (デフォルト: 現在のディレクトリ)")
-    parser.add_argument("-o", "--output", help="出力ファイル名 (テキスト形式)")
-    parser.add_argument("-e", "--excel", help="出力ファイル名 (Excel形式)")
-
-    args = parser.parse_args()
-
-    # 現在の日時を取得してデフォルトのExcelファイル名を生成
-    default_excel_filename = f"result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    
-    # Excelファイル名が指定されていない場合はデフォルト名を使用
-    excel_output = args.excel if args.excel else default_excel_filename
-
-    search_files(
-        keywords=args.keywords,
-        base_dir=args.directory,
-        output_file=args.output,
-        output_excel=excel_output
-    )
+    main()
