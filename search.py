@@ -13,11 +13,12 @@ import openpyxl
 def print_usage():
     """引数なしで実行された場合に表示するヘルプメッセージ"""
     usage = """
-使用方法: search.py [オプション] <検索語句>
+使用方法: search.py [オプション] <検索語句1> [<検索語句2> ...]
 
 説明:
   このプログラムはファイルやディレクトリ内のテキストを検索するためのツールです。
   引数なしで実行すると、このヘルプメッセージが表示されます。
+  複数の検索語句を指定すると、それぞれの語句について検索を行います。
   デフォルトでは、サブディレクトリも再帰的に検索し、大文字と小文字を区別しません。
   検索結果はデフォルトでExcelファイル（result_日時.xlsx）に出力されます。
 
@@ -32,7 +33,8 @@ def print_usage():
   -s, --stdout          結果を標準出力に表示します (Excelファイルは生成されません)
 
 例:
-  search.py "検索語句"                      # 検索結果をExcelファイルに出力
+  search.py "検索語句"                      # 単一の語句で検索
+  search.py "語句1" "語句2" "語句3"         # 複数の語句で検索
   search.py -p /path/to/dir "検索語句"      # 指定したディレクトリで検索
   search.py -c "検索語句"                   # 大文字小文字を区別して検索
   search.py -t csv "検索語句"               # 結果をCSV形式で出力
@@ -48,22 +50,6 @@ def get_default_output_filename():
     now = datetime.now()
     timestamp = now.strftime("%Y%m%d_%H%M%S")
     return f"result_{timestamp}.xlsx"
-
-def write_to_excel(filename, data):
-    """データをExcelファイルに書き込む"""
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "検索結果"
-    
-    # ヘッダーの書き込み
-    ws.append(["ファイル名", "行番号", "内容"])
-    
-    # データの書き込み
-    for item in data:
-        ws.append(item)
-    
-    wb.save(filename)
-    print(f"検索結果を {filename} に出力しました。")
 
 def main():
     # 引数がない場合はヘルプメッセージを表示して終了
@@ -82,12 +68,12 @@ def main():
     parser.add_argument('-t', '--output-type', choices=['excel', 'csv', 'text'], default='excel', 
                         help='出力形式を指定します (デフォルト: excel)')
     parser.add_argument('-s', '--stdout', action='store_true', help='結果を標準出力に表示します')
-    parser.add_argument('search_term', nargs='?', help='検索する語句')
+    parser.add_argument('search_terms', nargs='+', help='検索する語句（複数指定可能）')
     
     args = parser.parse_args()
     
     # --helpオプションが指定された場合もヘルプを表示
-    if args.help or not args.search_term:
+    if args.help or not args.search_terms:
         print_usage()
         sys.exit(0)
     
@@ -104,35 +90,72 @@ def main():
         output_file = args.output if args.output else get_default_output_filename()
     
     # ここに実際の検索処理を実装
-    # 例として、ダミーデータを使用
-    search_results = [
-        ("example.txt", 10, "これは検索結果の例です。"),
-        ("example.txt", 20, "別の検索結果の例です。")
-    ]
+    search_results = search_files(
+        keywords=args.search_terms,
+        base_dir=args.path,
+        recursive=recursive,
+        ignore_case=ignore_case,
+        file_pattern=args.file_pattern,
+        output_file=None if args.stdout else (output_file if args.output_type != 'excel' else None),
+        output_excel=output_file if output_to_file and args.output_type == 'excel' else None
+    )
     
     # 検索結果の出力
-    if output_to_file and args.output_type == 'excel':
-        write_to_excel(output_file, search_results)
-    elif args.stdout:
+    if args.stdout:
         for result in search_results:
             print(result)
 
-def search_files(keywords, base_dir='.', output_file=None, output_excel=None):
+def search_files(keywords, base_dir='.', recursive=True, ignore_case=True, file_pattern=None, output_file=None, output_excel=None):
     """
-    指定ディレクトリ以下のすべてのファイルを対象に、指定した単語を検索する
+    指定ディレクトリ以下のファイルを対象に、指定した単語を検索する
 
     :param keywords: 検索する単語のリスト
     :param base_dir: 検索対象の基準ディレクトリ
+    :param recursive: サブディレクトリを再帰的に検索するかどうか
+    :param ignore_case: 大文字小文字を区別しないかどうか
+    :param file_pattern: 検索対象のファイルパターン（例：*.txt）
     :param output_file: 結果を保存するテキストファイル（Noneの場合は標準出力）
     :param output_excel: 結果をExcelファイルとして保存するパス
     """
-    keyword_patterns = [re.compile(rf'\b{re.escape(keyword)}\b') for keyword in keywords]
+    # 大文字小文字を区別しない場合はre.IGNORECASEフラグを使用
+    flags = re.IGNORECASE if ignore_case else 0
+    keyword_patterns = [re.compile(rf'\b{re.escape(keyword)}\b', flags) for keyword in keywords]
+
+    # ファイルパターンがある場合は正規表現に変換
+    file_pattern_regex = None
+    if file_pattern:
+        # ワイルドカード（*）を正規表現に変換
+        pattern = file_pattern.replace('.', '\\.').replace('*', '.*')
+        file_pattern_regex = re.compile(f'^{pattern}$', re.IGNORECASE)
 
     results = {keyword: {'hit_count': 0, 'file_count': 0, 'files': {}} for keyword in keywords}
     excel_data = []
 
-    for root, _, files in os.walk(base_dir):
+    # 現在のスクリプトファイル名を取得
+    current_script = os.path.basename(__file__)
+
+    # 再帰的に検索するかどうかで処理を分ける
+    if recursive:
+        walk_func = os.walk
+    else:
+        # 非再帰的な場合は現在のディレクトリのみを処理する関数を作成
+        def walk_func(dir_path):
+            try:
+                files = [f for f in os.listdir(dir_path) if os.path.isfile(os.path.join(dir_path, f))]
+                yield dir_path, [], files
+            except Exception as e:
+                print(f"ディレクトリの読み込みエラー: {e}")
+
+    for root, _, files in walk_func(base_dir):
         for file in files:
+            # スクリプト自身を除外
+            if file == current_script:
+                continue
+
+            # ファイルパターンが指定されている場合、一致するファイルのみ処理
+            if file_pattern_regex and not file_pattern_regex.match(file):
+                continue
+
             file_path = os.path.join(root, file)
             relative_file_path = os.path.relpath(file_path, base_dir)  # 相対パスを取得し、"./"を除去
 
@@ -193,7 +216,8 @@ def search_files(keywords, base_dir='.', output_file=None, output_excel=None):
 
     if output_excel:
         save_results_to_excel(output_excel, results, excel_data)
-        print(f"検索結果を Excelファイル '{output_excel}' に保存しました。")
+
+    return result_text.splitlines()
 
 def save_results_to_excel(output_excel, results, excel_data):
     """
@@ -287,9 +311,6 @@ def save_results_to_excel(output_excel, results, excel_data):
         if keyword not in keyword_colors[file_path]:
             current_keyword_toggle = not current_keyword_toggle
             keyword_colors[file_path][keyword] = color_b1 if current_keyword_toggle else color_b2
-    
-    # 罫線グループのための変数
-    from openpyxl.styles import Border, Side
     
     # データを追加して色付け
     current_file = None
@@ -404,8 +425,12 @@ def save_results_to_excel(output_excel, results, excel_data):
         if col == 5:  # E列は最低60の幅を確保
             ws_details.column_dimensions[col_letter].width = max(current_width, 60)
 
-    # 保存
-    wb.save(output_excel)
+    try:
+        # 保存
+        wb.save(output_excel)
+        print(f"検索結果を Excelファイル '{output_excel}' に保存しました。")
+    except Exception as e:
+        print(f"エクセルファイルの保存中にエラーが発生しました: {e}")
 
 def draw_border_around_group(worksheet, start_row, end_row):
     """
