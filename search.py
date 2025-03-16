@@ -17,19 +17,21 @@ def print_usage():
 説明:
   このプログラムはファイルやディレクトリ内のテキストを検索するためのツールです。
   引数なしで実行すると、このヘルプメッセージが表示されます。
+  デフォルトでは、サブディレクトリも再帰的に検索し、大文字と小文字を区別しません。
 
 オプション:
   -h, --help            このヘルプメッセージを表示します
   -p, --path PATH       検索対象のパスを指定します (デフォルト: カレントディレクトリ)
-  -r, --recursive       サブディレクトリも再帰的に検索します
-  -i, --ignore-case     大文字と小文字を区別せずに検索します
+  -r, --no-recursive    サブディレクトリを再帰的に検索しません (デフォルトは再帰的に検索)
+  -c, --case-sensitive  大文字と小文字を区別して検索します (デフォルトは区別しない)
   -f, --file-pattern PAT 特定のファイルパターンのみを検索します (例: *.txt)
   -o, --output FILE     結果を指定したファイルに出力します
 
 例:
-  search.py "検索語句"                    # カレントディレクトリで「検索語句」を検索
+  search.py "検索語句"                    # すべてのディレクトリで「検索語句」を検索（大文字小文字区別なし）
   search.py -p /path/to/dir "検索語句"    # 指定したディレクトリで検索
-  search.py -r -i "検索語句"              # 再帰的に、大文字小文字を区別せずに検索
+  search.py -c "検索語句"                 # 大文字小文字を区別して検索
+  search.py -r "検索語句"                 # 再帰検索を無効にして検索
   search.py -f "*.py" "検索語句"          # Pythonファイルのみを検索
 
 詳細については、プロジェクトのドキュメントを参照してください。
@@ -46,8 +48,8 @@ def main():
     parser = argparse.ArgumentParser(description='ファイルやディレクトリ内のテキストを検索します', add_help=False)
     parser.add_argument('-h', '--help', action='store_true', help='ヘルプメッセージを表示します')
     parser.add_argument('-p', '--path', default='.', help='検索対象のパスを指定します')
-    parser.add_argument('-r', '--recursive', action='store_true', help='サブディレクトリも再帰的に検索します')
-    parser.add_argument('-i', '--ignore-case', action='store_true', help='大文字と小文字を区別せずに検索します')
+    parser.add_argument('-r', '--no-recursive', action='store_true', help='サブディレクトリを再帰的に検索しません')
+    parser.add_argument('-c', '--case-sensitive', action='store_true', help='大文字と小文字を区別して検索します')
     parser.add_argument('-f', '--file-pattern', help='特定のファイルパターンのみを検索します')
     parser.add_argument('-o', '--output', help='結果を指定したファイルに出力します')
     parser.add_argument('search_term', nargs='?', help='検索する語句')
@@ -59,7 +61,12 @@ def main():
         print_usage()
         sys.exit(0)
     
+    # デフォルト値の設定
+    recursive = not args.no_recursive  # デフォルトで再帰的に検索
+    ignore_case = not args.case_sensitive  # デフォルトで大文字小文字を区別しない
+    
     # ここに実際の検索処理を実装
+    # recursive変数とignore_case変数を使用して検索ロジックを制御
     # ...
 
 def search_files(keywords, base_dir='.', output_file=None, output_excel=None):
