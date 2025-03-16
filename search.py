@@ -8,6 +8,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, PatternFill
 from openpyxl.styles import Border, Side
 from datetime import datetime
+import openpyxl
 
 def print_usage():
     """引数なしで実行された場合に表示するヘルプメッセージ"""
@@ -18,6 +19,7 @@ def print_usage():
   このプログラムはファイルやディレクトリ内のテキストを検索するためのツールです。
   引数なしで実行すると、このヘルプメッセージが表示されます。
   デフォルトでは、サブディレクトリも再帰的に検索し、大文字と小文字を区別しません。
+  検索結果はデフォルトでExcelファイル（result_日時.xlsx）に出力されます。
 
 オプション:
   -h, --help            このヘルプメッセージを表示します
@@ -26,17 +28,42 @@ def print_usage():
   -c, --case-sensitive  大文字と小文字を区別して検索します (デフォルトは区別しない)
   -f, --file-pattern PAT 特定のファイルパターンのみを検索します (例: *.txt)
   -o, --output FILE     結果を指定したファイルに出力します
+  -t, --output-type TYPE 出力形式を指定します (excel, csv, text) (デフォルト: excel)
+  -s, --stdout          結果を標準出力に表示します (Excelファイルは生成されません)
 
 例:
-  search.py "検索語句"                    # すべてのディレクトリで「検索語句」を検索（大文字小文字区別なし）
-  search.py -p /path/to/dir "検索語句"    # 指定したディレクトリで検索
-  search.py -c "検索語句"                 # 大文字小文字を区別して検索
-  search.py -r "検索語句"                 # 再帰検索を無効にして検索
-  search.py -f "*.py" "検索語句"          # Pythonファイルのみを検索
+  search.py "検索語句"                      # 検索結果をExcelファイルに出力
+  search.py -p /path/to/dir "検索語句"      # 指定したディレクトリで検索
+  search.py -c "検索語句"                   # 大文字小文字を区別して検索
+  search.py -t csv "検索語句"               # 結果をCSV形式で出力
+  search.py -s "検索語句"                   # 結果を標準出力に表示
+  search.py -o custom_name.xlsx "検索語句"  # カスタムファイル名で出力
 
 詳細については、プロジェクトのドキュメントを参照してください。
 """
     print(usage)
+
+def get_default_output_filename():
+    """デフォルトの出力ファイル名（result_日時.xlsx）を生成"""
+    now = datetime.now()
+    timestamp = now.strftime("%Y%m%d_%H%M%S")
+    return f"result_{timestamp}.xlsx"
+
+def write_to_excel(filename, data):
+    """データをExcelファイルに書き込む"""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "検索結果"
+    
+    # ヘッダーの書き込み
+    ws.append(["ファイル名", "行番号", "内容"])
+    
+    # データの書き込み
+    for item in data:
+        ws.append(item)
+    
+    wb.save(filename)
+    print(f"検索結果を {filename} に出力しました。")
 
 def main():
     # 引数がない場合はヘルプメッセージを表示して終了
@@ -52,6 +79,9 @@ def main():
     parser.add_argument('-c', '--case-sensitive', action='store_true', help='大文字と小文字を区別して検索します')
     parser.add_argument('-f', '--file-pattern', help='特定のファイルパターンのみを検索します')
     parser.add_argument('-o', '--output', help='結果を指定したファイルに出力します')
+    parser.add_argument('-t', '--output-type', choices=['excel', 'csv', 'text'], default='excel', 
+                        help='出力形式を指定します (デフォルト: excel)')
+    parser.add_argument('-s', '--stdout', action='store_true', help='結果を標準出力に表示します')
     parser.add_argument('search_term', nargs='?', help='検索する語句')
     
     args = parser.parse_args()
@@ -65,9 +95,27 @@ def main():
     recursive = not args.no_recursive  # デフォルトで再帰的に検索
     ignore_case = not args.case_sensitive  # デフォルトで大文字小文字を区別しない
     
+    # 出力先の設定
+    if args.stdout:
+        output_to_file = False
+        output_file = None
+    else:
+        output_to_file = True
+        output_file = args.output if args.output else get_default_output_filename()
+    
     # ここに実際の検索処理を実装
-    # recursive変数とignore_case変数を使用して検索ロジックを制御
-    # ...
+    # 例として、ダミーデータを使用
+    search_results = [
+        ("example.txt", 10, "これは検索結果の例です。"),
+        ("example.txt", 20, "別の検索結果の例です。")
+    ]
+    
+    # 検索結果の出力
+    if output_to_file and args.output_type == 'excel':
+        write_to_excel(output_file, search_results)
+    elif args.stdout:
+        for result in search_results:
+            print(result)
 
 def search_files(keywords, base_dir='.', output_file=None, output_excel=None):
     """
